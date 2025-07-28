@@ -188,6 +188,12 @@ const getData = async () => {
         { endpoint: "dashboards/info", method: "GET" },
         { endpoint: "auth/users", method: "GET", queryParams: {dashboards: true} },
         { endpoint: "parameters", method: "GET" },
+        { endpoint: "apps/parsed/aso-mobile", method: "GET", queryParams: {limit: 10, offset: 0, keywords: true} },
+        { endpoint: "overviews", method: "GET", queryParams: {limit: 10, offset: 0, order_by: "rating", order: "desc",
+        min_rating: 0.01,
+        max_rating: 4.49,
+        min_number: 10
+            } },
         {
             endpoint: "apps-data",
             method: "GET",
