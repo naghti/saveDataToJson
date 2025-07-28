@@ -4,13 +4,14 @@ require('dotenv').config();
 const USER_NAME = process.env.USER_NAME;
 const PASSWORD = process.env.PASSWORD;
 const URL = process.env.API_URL;
+const URL_EMAIL = process.env.API_URL_EMAIL;
 
 const today = new Date();
 const yesterday = new Date(today);
 yesterday.setDate(yesterday.getDate() - 1);
 
 const weekAgo = new Date(today);
-weekAgo.setDate(weekAgo.getDate() - 7);
+weekAgo.setDate(weekAgo.getDate() - 8);
 
 function formatDate(date) {
     const year = date.getFullYear();
@@ -47,13 +48,13 @@ const getData = async () => {
             .catch((error) => console.error('error on get token', error));
     }
 
-    const fetchData = async (endpoint, method = "GET", body = null, queryParams = {}) => {
+    const fetchData = async (endpoint, method = "GET", body = null, queryParams = {}, isEmail = false) => {
         try {
             const myHeaders = new Headers();
             myHeaders.append("Authorization", `Bearer ${token}`);
 
             const queryString = new URLSearchParams(queryParams).toString();
-            const fullUrl = URL + endpoint + (queryString ? `?${queryString}` : '');
+            const fullUrl = (isEmail ? URL_EMAIL : URL) + endpoint + (queryString ? `?${queryString}` : '');
 
             const requestOptions = {
                 method: method,
@@ -185,6 +186,8 @@ const getData = async () => {
         },
         { endpoint: "niches", method: "GET" },
         { endpoint: "dashboards/info", method: "GET" },
+        { endpoint: "auth/users", method: "GET", queryParams: {dashboards: true} },
+        { endpoint: "parameters", method: "GET" },
         {
             endpoint: "apps-data",
             method: "GET",
@@ -240,15 +243,78 @@ const getData = async () => {
         savedData[key] = data;
     }
 
-    const appsList = savedData['/api/v1/apps']?.all || [];
+    const parametersList = savedData['/api/v1/parameters'] || [];
+    for (const param of parametersList) {
+        try {
+            const paramId = param.id;
+            const paramEndpoint = `parameters/${paramId}/apps-count`;
+
+            const paramData = await fetchData(
+                paramEndpoint,
+                "GET"
+            );
+
+            savedData[`/api/v1/${paramEndpoint}`] = paramData;
+        } catch (e) {
+            console.error('failed to fetch parameter apps-count', param.id, e);
+        }
+    }
+
+    const appsList = savedData['/api/v1/apps'] || [];
 
     for (const app of appsList) {
         try {
             const appId = app.id;
-            const endpoint = `apps/${appId}`;
+            const apphudAppId = app.apphud_app_id;
 
-            const data = await fetchData(endpoint);
-            savedData[`/api/v1/${endpoint}`] = data;
+            const appEndpoint = `apps/${appId}`;
+            const appData = await fetchData(appEndpoint);
+            savedData[`/api/v1/${appEndpoint}`] = appData;
+
+            const appDataEndpoint = `apps-data/${appId}`;
+            const appDataParams = {
+                from_date: formatDate(weekAgo),
+                to_date: formatDate(yesterday)
+            };
+            const appDataData = await fetchData(
+                appDataEndpoint,
+                "GET",
+                null,
+                appDataParams
+            );
+            savedData[`/api/v1/${appDataEndpoint}`] = appDataData;
+
+            const chartFullEndpoint = `chart/full/${appId}`;
+            const chartFullParams = {
+                from_date: formatDate(weekAgo),
+                to_date: formatDate(today)
+            };
+            const chartFullData = await fetchData(
+                chartFullEndpoint,
+                "GET",
+                null,
+                chartFullParams,
+            );
+            savedData[`/api/v1/${chartFullEndpoint}`] = chartFullData;
+
+            const parametersEndpoint = `parameters/apps/${appId}`;
+            const parametersData = await fetchData(
+                parametersEndpoint,
+                "GET"
+            );
+            savedData[`/api/v1/${parametersEndpoint}`] = parametersData;
+
+
+            const emailsEndpoint = `mails/apphud_apps/${apphudAppId}`;
+            const emailsData = await fetchData(
+                emailsEndpoint,
+                "GET",
+                null,
+                {},
+                true
+            );
+            savedData[`/api/v1/${emailsEndpoint}`] = emailsData;
+
         } catch (e) {
             console.error('failed to fetch app details', app.id, e);
         }
